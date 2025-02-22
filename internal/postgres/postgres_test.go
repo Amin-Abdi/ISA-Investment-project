@@ -15,6 +15,7 @@ import (
 )
 
 func setupTestDB() (*pgx.Conn, func(), error) {
+	// TODO: Remove this
 	os.Setenv("DB_URL", "postgres://myuser:mypassword@localhost:5432/my_database?sslmode=disable")
 	dbURL := os.Getenv("DB_URL")
 	fmt.Println("My test url", dbURL)
@@ -33,7 +34,13 @@ func setupTestDB() (*pgx.Conn, func(), error) {
 
 	// Create cleanup function to disconnect and remove test data
 	cleanup := func() {
+		//Delete all the test data inserted into the DB
 		_, err := conn.Exec(context.Background(), "DELETE FROM isas")
+		if err != nil {
+			log.Fatalf("Failed to cleanup isas table: %v", err)
+		}
+
+		_, err = conn.Exec(context.Background(), "DELETE FROM funds")
 		if err != nil {
 			log.Fatalf("Failed to cleanup isas table: %v", err)
 		}
@@ -96,7 +103,6 @@ func TestCreateISA(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			time.Sleep(100 * time.Millisecond) // Add a small delay
 			createdISA, err := store.GetIsa(ctx, isaID)
 			require.NoError(t, err)
 
@@ -176,4 +182,192 @@ func TestUpdate(t *testing.T) {
 		})
 	}
 
+}
+
+func TestCreateFund(t *testing.T) {
+	ctx := context.Background()
+
+	// Set up the test database
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	tests := map[string]struct {
+		initialFund  postgres.Fund
+		expectedFund postgres.Fund
+	}{
+		"success: Create a Fund": {
+			initialFund: postgres.Fund{
+				ID:          "4b24808e-4114-4076-ac8d-031532ef8576",
+				Name:        "Fund One",
+				Description: "A sample fund",
+				Type:        postgres.FundTypeEquity,
+				RiskLevel:   postgres.RiskLevelHigh,
+				Performance: 12.5,
+				TotalAmount: 1000000,
+			},
+			expectedFund: postgres.Fund{
+				ID:          "4b24808e-4114-4076-ac8d-031532ef8576",
+				Name:        "Fund One",
+				Description: "A sample fund",
+				Type:        postgres.FundTypeEquity,
+				RiskLevel:   postgres.RiskLevelHigh,
+				Performance: 12.5,
+				TotalAmount: 1000000,
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			// Create the fund
+			fundID, err := store.CreateFund(ctx, test.initialFund)
+			require.NoError(t, err)
+
+			// Get the fund back
+			createdFund, err := store.GetFund(ctx, fundID)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectedFund.ID, createdFund.ID)
+			assert.Equal(t, test.expectedFund.Name, createdFund.Name)
+			assert.Equal(t, test.expectedFund.Description, createdFund.Description)
+			assert.Equal(t, test.expectedFund.Type, createdFund.Type)
+			assert.Equal(t, test.expectedFund.RiskLevel, createdFund.RiskLevel)
+			assert.Equal(t, test.expectedFund.Performance, createdFund.Performance)
+			assert.Equal(t, test.expectedFund.TotalAmount, createdFund.TotalAmount)
+		})
+	}
+
+}
+
+func TestGetFundNotFound(t *testing.T) {
+	ctx := context.Background()
+
+	// Set up the test database
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	// Test for a Fund ID that doesn't exist
+	invalidID := "non-existent-id"
+	fund, err := store.GetFund(ctx, invalidID)
+
+	require.Error(t, err)
+	assert.Nil(t, fund)
+	fmt.Println("HERE:", err.Error())
+	assert.Contains(t, err.Error(), "get fund: ")
+}
+
+func TestUpdateFund(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	tests := map[string]struct {
+		initialFund   postgres.Fund
+		updateFund    postgres.Fund
+		expectedFund  postgres.Fund
+		errorContains string
+	}{
+		"success: Update an existing Fund": {
+			initialFund: postgres.Fund{
+				ID:          "123e4567-e89b-12d3-a456-426614174000",
+				Name:        "Tech Growth Fund",
+				Description: "A fund focused on technology stocks",
+				Type:        postgres.FundTypeEquity,
+				RiskLevel:   postgres.RiskLevelHigh,
+				Performance: 15.4,
+				TotalAmount: 1000000,
+			},
+			updateFund: postgres.Fund{
+				ID:          "123e4567-e89b-12d3-a456-426614174000",
+				Name:        "Tech Growth Fund Plus",
+				Description: "An updated description for the tech fund",
+			},
+			expectedFund: postgres.Fund{
+				ID:          "123e4567-e89b-12d3-a456-426614174000",
+				Name:        "Tech Growth Fund Plus",
+				Description: "An updated description for the tech fund",
+				Type:        postgres.FundTypeEquity,
+				RiskLevel:   postgres.RiskLevelHigh,
+				Performance: 15.4,
+				TotalAmount: 1000000,
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := store.CreateFund(ctx, test.initialFund)
+			require.NoError(t, err)
+
+			updatedFund, err := store.UpdateFund(ctx, test.updateFund.ID, test.updateFund.Name, test.updateFund.Description)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.expectedFund.ID, updatedFund.ID)
+			assert.Equal(t, test.expectedFund.Name, updatedFund.Name)
+			assert.Equal(t, test.expectedFund.Description, updatedFund.Description)
+			assert.Equal(t, test.expectedFund.TotalAmount, updatedFund.TotalAmount)
+			assert.Equal(t, test.expectedFund.Type, updatedFund.Type)
+			assert.Equal(t, test.expectedFund.RiskLevel, updatedFund.RiskLevel)
+			assert.Equal(t, test.expectedFund.Performance, updatedFund.Performance)
+			assert.WithinDuration(t, now, updatedFund.UpdatedAt, time.Millisecond*100)
+		})
+	}
+
+}
+
+func TestUpdateFundTotalAmount(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	initialFund := postgres.Fund{
+		ID:          "a8364471-0a6c-4537-a7e3-dc2a18d9f4b6",
+		Name:        "Growth Fund",
+		Description: "A high-risk, high-reward fund",
+		Type:        postgres.FundTypeEquity,
+		RiskLevel:   postgres.RiskLevelHigh,
+		Performance: 12.5,
+		TotalAmount: 50000,
+	}
+
+	_, err = store.CreateFund(ctx, initialFund)
+	require.NoError(t, err)
+
+	// Update total amount
+	newTotalAmount := 75000.0
+	updatedFund, err := store.UpdateFundTotalAmount(ctx, initialFund.ID, newTotalAmount)
+	require.NoError(t, err)
+
+	// Ensure only TotalAmount changed
+	assert.Equal(t, initialFund.ID, updatedFund.ID)
+	assert.Equal(t, initialFund.Name, updatedFund.Name)
+	assert.Equal(t, initialFund.Description, updatedFund.Description)
+	assert.Equal(t, initialFund.Type, updatedFund.Type)
+	assert.Equal(t, initialFund.RiskLevel, updatedFund.RiskLevel)
+	assert.Equal(t, initialFund.Performance, updatedFund.Performance)
+	assert.Equal(t, newTotalAmount, updatedFund.TotalAmount) // Ensure total amount is updated
+	assert.WithinDuration(t, now, updatedFund.UpdatedAt, time.Millisecond*100)
 }

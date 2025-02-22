@@ -12,42 +12,6 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-var (
-	fundsTable   = "funds"
-	fundsColumns = []string{
-		"id",
-		"name",
-		"description",
-		"type",
-		"risk_level",
-		"performance",
-		"total_amount",
-	}
-	investmentsTable   = "investments"
-	investmentsColumns = []string{
-		"id",
-		"isa_id",
-		"fund_id",
-		"amount",
-	}
-	isasTable   = "isas"
-	isasColumns = []string{
-		"id",
-		"user_id",
-		"fund_ids",
-		"cash_balance",
-		"investment_amount",
-	}
-	usersTable   = "users"
-	usersColumns = []string{
-		"id",
-		"first_name",
-		"last_name",
-		"email",
-		"password",
-	}
-)
-
 type Store struct {
 	db *pgx.Conn
 }
@@ -63,10 +27,7 @@ func (s *Store) CreateIsa(ctx context.Context, isa ISA) (string, error) {
 	now := time.Now()
 
 	logger = logger.WithFields(logrus.Fields{
-		"user_id":           isa.UserID,
-		"fund_ids":          isa.FundIDs,
-		"cash_balance":      isa.CashBalance,
-		"investment_amount": isa.InvestmentAmount,
+		"user_id": isa.UserID,
 	})
 
 	query := `INSERT INTO isas (id, user_id, fund_ids, cash_balance, investment_amount, created_at, updated_at)
@@ -84,7 +45,7 @@ func (s *Store) CreateIsa(ctx context.Context, isa ISA) (string, error) {
 	var isaID string
 	err := s.db.QueryRow(ctx, query, args...).Scan(&isaID)
 	if err != nil {
-		logger.WithError(err).Error("Failed to execute create isa query: %w", err)
+		logger.WithError(err).Error("Failed to execute create isa query")
 		return "", fmt.Errorf("execute create isa query: %w", err)
 	}
 
@@ -127,11 +88,8 @@ func (s *Store) UpdateIsa(ctx context.Context, isa ISA) (*ISA, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
 	logger = logger.WithFields(logrus.Fields{
-		"isa_id":            isa.ID,
-		"user_id":           isa.UserID,
-		"fund_ids":          isa.FundIDs,
-		"cash_balance":      isa.CashBalance,
-		"investment_amount": isa.InvestmentAmount,
+		"isa_id":  isa.ID,
+		"user_id": isa.UserID,
 	})
 
 	query := `UPDATE isas
@@ -169,4 +127,164 @@ func (s *Store) UpdateIsa(ctx context.Context, isa ISA) (*ISA, error) {
 
 	logger.Info("ISA successfully updated")
 	return &updatedISA, nil
+}
+
+func (s *Store) CreateFund(ctx context.Context, fund Fund) (string, error) {
+	logger := logrus.New().WithContext(ctx)
+	now := time.Now()
+
+	logger = logger.WithFields(logrus.Fields{
+		"fund_id": fund.ID,
+	})
+
+	query := `INSERT INTO funds (id, name, description, type, risk_level, performance, total_amount, created_at, updated_at)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`
+
+	args := []any{
+		fund.ID,
+		fund.Name,
+		fund.Description,
+		fund.Type,
+		fund.RiskLevel,
+		fund.Performance,
+		fund.TotalAmount,
+		now,
+		now,
+	}
+
+	var fundID string
+	err := s.db.QueryRow(ctx, query, args...).Scan(&fundID)
+	if err != nil {
+		logger.WithError(err).Error("Failed to execute create fund query: %w", err)
+		return "", fmt.Errorf("execute create fund query: %w", err)
+	}
+
+	logger.Info("Fund successfully created")
+	return fundID, nil
+}
+
+func (s *Store) GetFund(ctx context.Context, id string) (*Fund, error) {
+	logger := logrus.New().WithContext(ctx)
+
+	logger = logger.WithField("fund_id", id)
+
+	query := `SELECT id, name, description, type, risk_level, performance, total_amount, created_at, updated_at
+		FROM funds WHERE id = $1`
+
+	var fund Fund
+	err := s.db.QueryRow(ctx, query, id).
+		Scan(
+			&fund.ID,
+			&fund.Name,
+			&fund.Description,
+			&fund.Type,
+			&fund.RiskLevel,
+			&fund.Performance,
+			&fund.TotalAmount,
+			&fund.CreatedAt,
+			&fund.UpdatedAt,
+		)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.WithError(err).Error("Failed to find fund")
+			return nil, fmt.Errorf("get fund: %w", err)
+		}
+		logger.WithError(err).Error("Failed to execute query for get fund")
+		return nil, fmt.Errorf("failed to execute query for get fund: %w", err)
+	}
+
+	return &fund, nil
+}
+
+// UpdateFund updates the fund details i.e, name and description.
+func (s *Store) UpdateFund(ctx context.Context, id, name, description string) (*Fund, error) {
+	logger := logrus.New().WithContext(ctx)
+	now := time.Now()
+
+	logger = logger.WithFields(logrus.Fields{
+		"fund_id": id,
+	})
+
+	query := `UPDATE funds
+	SET name = $1, description = $2, updated_at = $3
+	WHERE id = $4
+	RETURNING id, name, description, type, risk_level, performance, total_amount, created_at, updated_at`
+
+	args := []any{
+		name,
+		description,
+		now,
+		id,
+	}
+
+	var updatedFund Fund
+	err := s.db.QueryRow(ctx, query, args...).Scan(
+		&updatedFund.ID,
+		&updatedFund.Name,
+		&updatedFund.Description,
+		&updatedFund.Type,
+		&updatedFund.RiskLevel,
+		&updatedFund.Performance,
+		&updatedFund.TotalAmount,
+		&updatedFund.CreatedAt,
+		&updatedFund.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.WithError(err).Error("Fund not found for update")
+			return nil, fmt.Errorf("fund not found: %w", err)
+		}
+		logger.WithError(err).Error("Failed to execute update fund query")
+		return nil, fmt.Errorf("failed to execute update fund query: %w", err)
+	}
+
+	logger.Info("Fund successfully updated")
+	return &updatedFund, nil
+}
+
+// UpdateFundTotalAmount updates the total amount in a fund
+func (s *Store) UpdateFundTotalAmount(ctx context.Context, fundID string, totalAmount float64) (*Fund, error) {
+	logger := logrus.New().WithContext(ctx)
+	now := time.Now()
+
+	logger = logger.WithFields(logrus.Fields{
+		"fund_id":      fundID,
+		"total_amount": totalAmount,
+	})
+
+	query := `UPDATE funds
+	SET total_amount = $1, updated_at = $2
+	WHERE id = $3
+	RETURNING id, name, description, type, risk_level, performance, total_amount, created_at, updated_at`
+
+	args := []any{
+		totalAmount,
+		now,
+		fundID,
+	}
+
+	var updatedFund Fund
+	err := s.db.QueryRow(ctx, query, args...).Scan(
+		&updatedFund.ID,
+		&updatedFund.Name,
+		&updatedFund.Description,
+		&updatedFund.Type,
+		&updatedFund.RiskLevel,
+		&updatedFund.Performance,
+		&updatedFund.TotalAmount,
+		&updatedFund.CreatedAt,
+		&updatedFund.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.WithError(err).Error("Fund not found for update")
+			return nil, fmt.Errorf("fund not found: %w", err)
+		}
+		logger.WithError(err).Error("Failed to execute update fund total amount query")
+		return nil, fmt.Errorf("failed to execute update fund total amount query: %w", err)
+	}
+
+	logger.Info("Fund total amount successfully updated")
+	return &updatedFund, nil
 }
