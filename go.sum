@@ -1,0 +1,7 @@
+github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236 h1:lpeNC/cx4y6FT5JiXlPF/Fuw1KOHPnwDACCs81cpHos=
+github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236/go.mod h1:hQPgqeM4LmbfKCaBkcedRq5y1yfb8Qb8iYdbuNjE4FU=
+github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
+github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
+github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
