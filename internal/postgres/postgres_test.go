@@ -15,8 +15,6 @@ import (
 )
 
 func setupTestDB() (*pgx.Conn, func(), error) {
-	// TODO: Remove this
-	os.Setenv("DB_URL", "postgres://myuser:mypassword@localhost:5432/my_database?sslmode=disable")
 	dbURL := os.Getenv("DB_URL")
 	fmt.Println("My test url", dbURL)
 
