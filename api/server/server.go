@@ -26,31 +26,13 @@ func (s *Server) Start() error {
 	// Run the server
 	r.POST("/isa", s.CreateIsa)
 	r.POST("/fund", s.CreateFund)
+
 	r.PUT("/funds/:id", s.UpdateFund)
+	r.PUT("/isa/:isa_id/fund/:fund_id", s.AddFundToIsa)
 
 	r.GET("/isa/:id", s.GetIsa)
 
 	return r.Run(":8080")
-}
-
-// Test remove this
-func (s *Server) GetIsa(c *gin.Context) {
-	isaID := c.Param("id")
-
-	// You would fetch the ISA from the database here
-	// If not found, return an error. For now, we'll just simulate it.
-	if isaID == "" {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "ISA not found",
-		})
-		return
-	}
-
-	// Successful response for demo purposes
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Getting the ISA",
-		"isa_id":  isaID,
-	})
 }
 
 func (s *Server) CreateIsa(c *gin.Context) {
@@ -85,6 +67,26 @@ func (s *Server) CreateIsa(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Isa successfully created",
 		"isa_id":  createdIsaID,
+	})
+}
+
+func (s *Server) GetIsa(c *gin.Context) {
+	isaID := c.Param("id")
+	logger := logrus.New().WithContext(c.Request.Context())
+
+	isa, err := s.store.GetIsa(c.Request.Context(), isaID)
+	if err != nil {
+		if err == postgres.ErrNotFound {
+			logger.WithError(err).Error("Failed to find Isa")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"isa": isa,
 	})
 }
 
@@ -156,5 +158,33 @@ func (s *Server) UpdateFund(c *gin.Context) {
 	})
 }
 
+func (s *Server) AddFundToIsa(c *gin.Context) {
+	logger := logrus.New().WithContext(c.Request.Context())
+	isaID := c.Param("isa_id")
+	fundID := c.Param("fund_id")
+
+	updatedIsa, err := s.store.AddFundToISA(c.Request.Context(), isaID, fundID)
+	if err != nil {
+		if err == postgres.ErrNotFound {
+			logger.WithError(err).Error("Failed to find Isa")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":     "Fund successfully added to ISA",
+		"updated_isa": updatedIsa,
+	})
+}
+
 //List Investments
 //Get Investments
+
+/*
+When creating an investment, we need to make sure that the fund ID (the destination fund is related to the
+ISA otherwise return an error)
+
+*/
