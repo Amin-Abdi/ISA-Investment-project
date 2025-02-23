@@ -84,27 +84,30 @@ func (s *Store) GetIsa(ctx context.Context, id string) (*ISA, error) {
 	return &isa, nil
 }
 
-func (s *Store) UpdateIsa(ctx context.Context, isa ISA) (*ISA, error) {
+func (s *Store) UpdateIsa(ctx context.Context, isaID string, cashBalance, investmentAmount float64) (*ISA, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
 	logger = logger.WithFields(logrus.Fields{
-		"isa_id":  isa.ID,
-		"user_id": isa.UserID,
+		"isa_id":            isaID,
+		"cash_balance":      cashBalance,
+		"investment_amount": investmentAmount,
 	})
 
 	query := `UPDATE isas
-	SET fund_ids = $1, cash_balance = $2, investment_amount = $3, updated_at = $4
-	WHERE id = $5
-	RETURNING id, user_id, fund_ids, cash_balance, investment_amount, created_at, updated_at`
+              SET cash_balance = $1, 
+                  investment_amount = $2, 
+                  updated_at = $3
+              WHERE id = $4
+              RETURNING id, user_id, fund_ids, cash_balance, investment_amount, created_at, updated_at`
 
 	args := []any{
-		pq.Array(isa.FundIDs),
-		isa.CashBalance,
-		isa.InvestmentAmount,
-		now, // Update the timestamp
-		isa.ID,
+		cashBalance,
+		investmentAmount,
+		now,
+		isaID,
 	}
 
+	// Execute the query and retrieve the updated ISA details
 	var updatedISA ISA
 	err := s.db.QueryRow(ctx, query, args...).Scan(
 		&updatedISA.ID,
@@ -124,8 +127,38 @@ func (s *Store) UpdateIsa(ctx context.Context, isa ISA) (*ISA, error) {
 		logger.WithError(err).Error("Failed to execute update isa query")
 		return nil, fmt.Errorf("failed to execute update isa query: %w", err)
 	}
-
 	logger.Info("ISA successfully updated")
+	return &updatedISA, nil
+}
+
+func (s *Store) AddFundToISA(ctx context.Context, isaID, fundID string) (*ISA, error) {
+	logger := logrus.New().WithContext(ctx)
+
+	// Update the ISA's fund_ids array by appending the new fund_id
+	updateQuery := `
+        UPDATE isas 
+        SET fund_ids = array_append(fund_ids, $1), updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2 
+        RETURNING id, user_id, fund_ids, cash_balance, investment_amount, created_at, updated_at
+    `
+	args := []any{fundID, isaID}
+
+	var updatedISA ISA
+	err := s.db.QueryRow(ctx, updateQuery, args...).Scan(
+		&updatedISA.ID,
+		&updatedISA.UserID,
+		pq.Array(&updatedISA.FundIDs),
+		&updatedISA.CashBalance,
+		&updatedISA.InvestmentAmount,
+		&updatedISA.CreatedAt,
+		&updatedISA.UpdatedAt,
+	)
+	if err != nil {
+		logger.WithError(err).Error("Failed to update ISA with new fund")
+		return nil, fmt.Errorf("failed to update ISA with new fund: %w", err)
+	}
+
+	logger.Info("Fund successfully added to ISA")
 	return &updatedISA, nil
 }
 
@@ -289,6 +322,7 @@ func (s *Store) UpdateFundTotalAmount(ctx context.Context, fundID string, totalA
 	return &updatedFund, nil
 }
 
+// ListFunds lists all the funds for the user to select from
 func (s *Store) ListFunds(ctx context.Context) ([]Fund, error) {
 	logger := logrus.New().WithContext(ctx)
 
@@ -329,6 +363,7 @@ func (s *Store) ListFunds(ctx context.Context) ([]Fund, error) {
 
 }
 
+// CreateInvestment
 func (s *Store) CreateInvestment(ctx context.Context, investment Investment) (string, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()

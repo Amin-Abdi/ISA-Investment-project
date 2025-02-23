@@ -123,10 +123,48 @@ func TestCreateISA(t *testing.T) {
 
 }
 
-func TestUpdate(t *testing.T) {
+func TestAddFundToIsa(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
-	//Set up the test database
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+	initialISA := postgres.ISA{
+		ID:               "ccba7538-a706-4816-b85a-2424f64df11a",
+		UserID:           "6343b120-b611-4288-a8ff-9c79dec043f1",
+		FundIDs:          []string{},
+		CashBalance:      10000,
+		InvestmentAmount: 25000,
+	}
+
+	// Create the initial ISA
+	_, err = store.CreateIsa(ctx, initialISA)
+	require.NoError(t, err)
+
+	// Fund to add
+	fundID := "4b24808e-4114-4076-ac8d-031532ef8576"
+
+	// Add the fund to the ISA
+	updatedISA, err := store.AddFundToISA(ctx, initialISA.ID, fundID)
+	require.NoError(t, err)
+
+	// Assert the ISA was updated
+	assert.Equal(t, initialISA.ID, updatedISA.ID)
+	assert.Equal(t, initialISA.UserID, updatedISA.UserID)
+	assert.Equal(t, 1, len(updatedISA.FundIDs))    // One fund should be added
+	assert.Equal(t, fundID, updatedISA.FundIDs[0]) // The added fund ID should be the first item in the array
+
+	// Check that the updated_at timestamp has been updated
+	assert.WithinDuration(t, now, updatedISA.UpdatedAt, time.Millisecond*100)
+}
+
+func TestUpdateISA(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
 	conn, cleanup, err := setupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
@@ -141,7 +179,7 @@ func TestUpdate(t *testing.T) {
 		expectedISA   postgres.ISA
 		errorContains string
 	}{
-		"success: Update an existing ISA": {
+		"success: Update cash_balance and investment_amount of an existing ISA": {
 			initialISA: postgres.ISA{
 				ID:               "d9e89726-46f7-4f36-99ff-c9f45fd58fb3",
 				UserID:           "6343b120-b611-4288-a8ff-9c79dec043f1",
@@ -151,40 +189,42 @@ func TestUpdate(t *testing.T) {
 			},
 			updateISA: postgres.ISA{
 				ID:               "d9e89726-46f7-4f36-99ff-c9f45fd58fb3",
-				FundIDs:          []string{"fe865bc7-5f3e-4523-895d-67b705041e5b", "289a532f-d7c3-423a-b5cb-af4a3f26ae48"},
 				CashBalance:      15000,
 				InvestmentAmount: 35000,
 			},
 			expectedISA: postgres.ISA{
 				ID:               "d9e89726-46f7-4f36-99ff-c9f45fd58fb3",
 				UserID:           "6343b120-b611-4288-a8ff-9c79dec043f1", // UserID should remain the same
-				FundIDs:          []string{"fe865bc7-5f3e-4523-895d-67b705041e5b", "289a532f-d7c3-423a-b5cb-af4a3f26ae48"},
-				CashBalance:      15000,
-				InvestmentAmount: 35000,
+				FundIDs:          []string{"a8364471-0a6c-4537-a7e3-dc2a18d9f4b6"},
+				CashBalance:      15000, // Updated cash balance
+				InvestmentAmount: 35000, // Updated investment amount
 			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-
+			// Create initial ISA in the database
 			_, err := store.CreateIsa(ctx, test.initialISA)
 			require.NoError(t, err)
 
-			updatedISA, err := store.UpdateIsa(ctx, test.updateISA)
+			// Update ISA's cash_balance and investment_amount
+			updatedISA, err := store.UpdateIsa(ctx, test.updateISA.ID, test.updateISA.CashBalance, test.updateISA.InvestmentAmount)
 			require.NoError(t, err)
 
+			// Assert that the updated ISA matches the expected ISA
 			assert.Equal(t, test.expectedISA.ID, updatedISA.ID)
 			assert.Equal(t, test.expectedISA.UserID, updatedISA.UserID)
 			assert.Equal(t, test.expectedISA.CashBalance, updatedISA.CashBalance)
 			assert.Equal(t, test.expectedISA.InvestmentAmount, updatedISA.InvestmentAmount)
 			assert.WithinDuration(t, now, updatedISA.UpdatedAt, time.Millisecond*100)
+
+			// Assert that the Fund IDs remain unchanged
 			for i, fundID := range updatedISA.FundIDs {
 				assert.Equal(t, test.expectedISA.FundIDs[i], fundID)
 			}
 		})
 	}
-
 }
 
 func TestCreateFund(t *testing.T) {
