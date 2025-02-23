@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"slices"
@@ -11,6 +12,21 @@ import (
 
 	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
 )
+
+type Store interface {
+	CreateIsa(ctx context.Context, isa postgres.ISA) (string, error)
+	GetIsa(ctx context.Context, id string) (*postgres.ISA, error)
+	UpdateIsa(ctx context.Context, isaID string, cashBalance, investmentAmount float64) (*postgres.ISA, error)
+	AddFundToISA(ctx context.Context, isaID, fundID string) (*postgres.ISA, error)
+	CreateFund(ctx context.Context, fund postgres.Fund) (string, error)
+	GetFund(ctx context.Context, id string) (*postgres.Fund, error)
+	UpdateFund(ctx context.Context, id, name, description string) (*postgres.Fund, error)
+	UpdateFundTotalAmount(ctx context.Context, fundID string, totalAmount float64) (*postgres.Fund, error)
+	ListFunds(ctx context.Context) ([]postgres.Fund, error)
+	CreateInvestment(ctx context.Context, investment postgres.Investment) (string, error)
+	GetInvestment(ctx context.Context, investmentID string) (*postgres.Investment, error)
+	ListInvestments(ctx context.Context, isaID string) ([]postgres.Investment, error)
+}
 
 type Server struct {
 	store *postgres.Store
