@@ -288,3 +288,43 @@ func (s *Store) UpdateFundTotalAmount(ctx context.Context, fundID string, totalA
 	logger.Info("Fund total amount successfully updated")
 	return &updatedFund, nil
 }
+
+func (s *Store) ListFunds(ctx context.Context) ([]Fund, error) {
+	logger := logrus.New().WithContext(ctx)
+
+	query := `SELECT id, name, description, type, risk_level, performance, total_amount, created_at, updated_at FROM funds`
+
+	rows, err := s.db.Query(ctx, query)
+	if err != nil {
+		logger.WithError(err).Error("Failed to execute query for list funds")
+		return nil, fmt.Errorf("failed to execute query for list funds: %w", err)
+	}
+
+	var funds []Fund
+	for rows.Next() {
+		var fund Fund
+		if err := rows.Scan(
+			&fund.ID,
+			&fund.Name,
+			&fund.Description,
+			&fund.Type,
+			&fund.RiskLevel,
+			&fund.Performance,
+			&fund.TotalAmount,
+			&fund.CreatedAt,
+			&fund.UpdatedAt,
+		); err != nil {
+			logger.WithError(err).Error("Failed to scan fund row")
+			return nil, fmt.Errorf("failed to scan fund row: %w", err)
+		}
+		funds = append(funds, fund)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.WithError(err).Error("Error iterating over fund rows")
+		return nil, fmt.Errorf("error iterating over fund rows: %w", err)
+	}
+
+	return funds, nil
+
+}

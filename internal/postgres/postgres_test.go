@@ -369,3 +369,54 @@ func TestUpdateFundTotalAmount(t *testing.T) {
 	assert.Equal(t, newTotalAmount, updatedFund.TotalAmount) // Ensure total amount is updated
 	assert.WithinDuration(t, now, updatedFund.UpdatedAt, time.Millisecond*100)
 }
+
+func TestListFunds(t *testing.T) {
+	ctx := context.Background()
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	fund1 := postgres.Fund{
+		ID:          "4b24808e-4114-4076-ac8d-031532ef8576",
+		Name:        "Fund One",
+		Description: "A sample fund",
+		Type:        postgres.FundTypeEquity,
+		RiskLevel:   postgres.RiskLevelHigh,
+		Performance: 12.5,
+		TotalAmount: 1000000,
+	}
+	fund2 := postgres.Fund{
+		ID:          "7c9b02c8-2924-48b4-9223-2e6471bc1939",
+		Name:        "Fund Two",
+		Description: "Another sample fund",
+		Type:        postgres.FundTypeBond,
+		RiskLevel:   postgres.RiskLevelLow,
+		Performance: 8.7,
+		TotalAmount: 500000,
+	}
+
+	_, err = store.CreateFund(ctx, fund1)
+	require.NoError(t, err)
+	_, err = store.CreateFund(ctx, fund2)
+	require.NoError(t, err)
+
+	gotFunds, err := store.ListFunds(ctx)
+	require.NoError(t, err)
+
+	assert.Len(t, gotFunds, 2)
+	expectedFunds := []postgres.Fund{fund1, fund2}
+
+	for i := range gotFunds {
+		assert.Equal(t, expectedFunds[i].ID, gotFunds[i].ID)
+		assert.Equal(t, expectedFunds[i].Name, gotFunds[i].Name)
+		assert.Equal(t, expectedFunds[i].Description, gotFunds[i].Description)
+		assert.Equal(t, expectedFunds[i].Type, gotFunds[i].Type)
+		assert.Equal(t, expectedFunds[i].RiskLevel, gotFunds[i].RiskLevel)
+		assert.Equal(t, expectedFunds[i].Performance, gotFunds[i].Performance)
+		assert.Equal(t, expectedFunds[i].TotalAmount, gotFunds[i].TotalAmount)
+	}
+}
