@@ -328,3 +328,66 @@ func (s *Store) ListFunds(ctx context.Context) ([]Fund, error) {
 	return funds, nil
 
 }
+
+func (s *Store) CreateInvestment(ctx context.Context, investment Investment) (string, error) {
+	logger := logrus.New().WithContext(ctx)
+	now := time.Now()
+
+	logger = logger.WithFields(logrus.Fields{
+		"isa_id":  investment.ISAID,
+		"fund_id": investment.FundID,
+		"amount":  investment.Amount,
+	})
+
+	fmt.Println("ISA ID:", investment.ISAID, " Fund ID:", investment.FundID)
+
+	query := `INSERT INTO investments (id, isa_id, fund_id, amount, invested_at, created_at)
+	VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+
+	args := []any{
+		investment.ID,
+		investment.ISAID,
+		investment.FundID,
+		investment.Amount,
+		now,
+		now,
+	}
+
+	var investmentID string
+	err := s.db.QueryRow(ctx, query, args...).Scan(&investmentID)
+	if err != nil {
+		logger.WithError(err).Error("Failed to execute create investment query")
+		return "", fmt.Errorf("execute create investment query: %w", err)
+	}
+
+	logger.Info("Investment successfully created")
+	return investmentID, nil
+}
+
+func (s *Store) GetInvestment(ctx context.Context, investmentID string) (*Investment, error) {
+	logger := logrus.New().WithContext(ctx)
+	logger = logger.WithField("investment_id", investmentID)
+
+	query := `SELECT id, isa_id, fund_id, amount, invested_at, created_at 
+			  FROM investments WHERE id = $1`
+
+	var investment Investment
+	err := s.db.QueryRow(ctx, query, investmentID).Scan(
+		&investment.ID,
+		&investment.ISAID,
+		&investment.FundID,
+		&investment.Amount,
+		&investment.InvestedAt,
+		&investment.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.WithError(err).Error("Investment not found")
+			return nil, fmt.Errorf("investment not found: %w", err)
+		}
+		logger.WithError(err).Error("Failed to execute get investment query")
+		return nil, fmt.Errorf("execute get investment query: %w", err)
+	}
+
+	return &investment, nil
+}

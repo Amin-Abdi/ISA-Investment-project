@@ -42,6 +42,11 @@ func setupTestDB() (*pgx.Conn, func(), error) {
 		if err != nil {
 			log.Fatalf("Failed to cleanup isas table: %v", err)
 		}
+
+		_, err = conn.Exec(context.Background(), "DELETE FROM investments")
+		if err != nil {
+			log.Fatalf("Failed to cleanup investments table: %v", err)
+		}
 		conn.Close(ctx)
 	}
 
@@ -418,5 +423,94 @@ func TestListFunds(t *testing.T) {
 		assert.Equal(t, expectedFunds[i].RiskLevel, gotFunds[i].RiskLevel)
 		assert.Equal(t, expectedFunds[i].Performance, gotFunds[i].Performance)
 		assert.Equal(t, expectedFunds[i].TotalAmount, gotFunds[i].TotalAmount)
+	}
+}
+
+func TestCreateInvestment(t *testing.T) {
+	ctx := context.Background()
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	isa := postgres.ISA{
+		ID:               "ccba7538-a706-4816-b85a-2424f64df11a",
+		UserID:           "6343b120-b611-4288-a8ff-9c79dec043f1",
+		FundIDs:          []string{},
+		CashBalance:      50000,
+		InvestmentAmount: 0,
+	}
+	_, err = store.CreateIsa(ctx, isa)
+	require.NoError(t, err)
+
+	fund := postgres.Fund{
+		ID:          "4b24808e-4114-4076-ac8d-031532ef8576",
+		Name:        "Fund One",
+		Description: "A sample fund",
+		Type:        postgres.FundTypeEquity,
+		RiskLevel:   postgres.RiskLevelHigh,
+		Performance: 12.5,
+		TotalAmount: 1000000,
+	}
+	_, err = store.CreateFund(ctx, fund)
+	require.NoError(t, err)
+
+	tests := map[string]struct {
+		initialInvestment postgres.Investment
+		errorContains     string
+	}{
+		"success: Create an Investment": {
+			initialInvestment: postgres.Investment{
+				ID:     "ad3e30a4-761b-4e0d-a6f5-4fc8a1b4f299",
+				ISAID:  isa.ID,
+				FundID: fund.ID,
+				Amount: 10000,
+			},
+		},
+		"failure: Create Investment with non-existent ISA": {
+			initialInvestment: postgres.Investment{
+				ID:     "0f71a84e-8cd3-4a87-b4c4-7ef582aa5f31",
+				ISAID:  "2ba4eb3d-68f6-475c-9164-a5717eab1acc", //non-existent ISA
+				FundID: fund.ID,
+				Amount: 5000,
+			},
+			errorContains: "foreign key constraint",
+		},
+		"failure: Create Investment with non-existent Fund": {
+			initialInvestment: postgres.Investment{
+				ID:     "1d41e3e2-f841-4f6b-ae2c-2bdf1ad0ecbd",
+				ISAID:  isa.ID,
+				FundID: "2ba4eb3d-68f6-475c-9164-a5717eab1acc", //non-existent Fund
+				Amount: 5000,
+			},
+			errorContains: "foreign key constraint",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			investmentID, err := store.CreateInvestment(ctx, test.initialInvestment)
+			if test.errorContains != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), test.errorContains)
+				return
+			}
+
+			require.NoError(t, err)
+
+			createdInvestment, err := store.GetInvestment(ctx, investmentID)
+			require.NoError(t, err)
+
+			assert.Equal(t, test.initialInvestment.ID, createdInvestment.ID)
+			assert.Equal(t, test.initialInvestment.ISAID, createdInvestment.ISAID)
+			assert.Equal(t, test.initialInvestment.FundID, createdInvestment.FundID)
+			assert.Equal(t, test.initialInvestment.Amount, createdInvestment.Amount)
+			assert.WithinDuration(t, time.Now(), createdInvestment.InvestedAt, time.Millisecond*100)
+			assert.WithinDuration(t, time.Now(), createdInvestment.CreatedAt, time.Millisecond*100)
+
+		})
 	}
 }
