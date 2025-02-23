@@ -31,6 +31,7 @@ func (s *Server) Start() error {
 	r.PUT("/isa/:isa_id/fund/:fund_id", s.AddFundToIsa)
 
 	r.GET("/isa/:id", s.GetIsa)
+	r.GET("/funds", s.ListFunds)
 
 	return r.Run(":8080")
 }
@@ -89,6 +90,10 @@ func (s *Server) GetIsa(c *gin.Context) {
 		"isa": isa,
 	})
 }
+
+//Add money to ISA
+
+//Deposit money into a fund, which in turn will subtract the cash balance from isa and add investments
 
 func (s *Server) CreateFund(c *gin.Context) {
 	var req CreateFundRequest
@@ -158,6 +163,21 @@ func (s *Server) UpdateFund(c *gin.Context) {
 	})
 }
 
+func (s *Server) ListFunds(c *gin.Context) {
+	logger := logrus.New().WithContext(c.Request.Context())
+
+	funds, err := s.store.ListFunds(c.Request.Context())
+	if err != nil {
+		logger.WithError(err).Error("Failed to retrieve funds")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"funds": funds,
+	})
+}
+
 func (s *Server) AddFundToIsa(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	isaID := c.Param("isa_id")
@@ -180,6 +200,7 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	})
 }
 
+//TODO:
 //List Investments
 //Get Investments
 

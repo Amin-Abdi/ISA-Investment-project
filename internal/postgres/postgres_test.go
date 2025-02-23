@@ -554,3 +554,83 @@ func TestCreateInvestment(t *testing.T) {
 		})
 	}
 }
+
+func TestListInvestments(t *testing.T) {
+	ctx := context.Background()
+	conn, cleanup, err := setupTestDB()
+	if err != nil {
+		t.Fatalf("Failed to set up database: %v", err)
+	}
+	defer cleanup()
+
+	store := postgres.NewStore(conn)
+
+	// Create an ISA
+	isa := postgres.ISA{
+		ID:               "ccba7538-a706-4816-b85a-2424f64df11a",
+		UserID:           "6343b120-b611-4288-a8ff-9c79dec043f1",
+		FundIDs:          []string{},
+		CashBalance:      50000,
+		InvestmentAmount: 0,
+	}
+	_, err = store.CreateIsa(ctx, isa)
+	require.NoError(t, err)
+
+	// Create Funds
+	fund1 := postgres.Fund{
+		ID:          "4b24808e-4114-4076-ac8d-031532ef8576",
+		Name:        "Fund One",
+		Description: "A sample fund",
+		Type:        postgres.FundTypeEquity,
+		RiskLevel:   postgres.RiskLevelHigh,
+		Performance: 12.5,
+		TotalAmount: 1000000,
+	}
+	_, err = store.CreateFund(ctx, fund1)
+	require.NoError(t, err)
+
+	fund2 := postgres.Fund{
+		ID:          "5d3f9f76-7521-4e1f-bd47-89dbb9b45e67",
+		Name:        "Fund Two",
+		Description: "Another sample fund",
+		Type:        postgres.FundTypeBond,
+		RiskLevel:   postgres.RiskLevelMedium,
+		Performance: 8.2,
+		TotalAmount: 500000,
+	}
+	_, err = store.CreateFund(ctx, fund2)
+	require.NoError(t, err)
+
+	// Create Investments
+	investment1 := postgres.Investment{
+		ID:     "ad3e30a4-761b-4e0d-a6f5-4fc8a1b4f299",
+		ISAID:  isa.ID,
+		FundID: fund1.ID,
+		Amount: 10000,
+	}
+	_, err = store.CreateInvestment(ctx, investment1)
+	require.NoError(t, err)
+
+	investment2 := postgres.Investment{
+		ID:     "1d41e3e2-f841-4f6b-ae2c-2bdf1ad0ecbd",
+		ISAID:  isa.ID,
+		FundID: fund2.ID,
+		Amount: 5000,
+	}
+	_, err = store.CreateInvestment(ctx, investment2)
+	require.NoError(t, err)
+
+	// List Investments
+	investments, err := store.ListInvestments(ctx, isa.ID)
+	require.NoError(t, err)
+	require.Len(t, investments, 2)
+
+	expectedInvestments := []postgres.Investment{investment1, investment2}
+
+	for i := range investments {
+		assert.Equal(t, expectedInvestments[i].ID, investments[i].ID)
+		assert.Equal(t, expectedInvestments[i].ISAID, investments[i].ISAID)
+		assert.Equal(t, expectedInvestments[i].FundID, investments[i].FundID)
+		assert.Equal(t, expectedInvestments[i].Amount, investments[i].Amount)
+	}
+}

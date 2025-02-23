@@ -27,6 +27,7 @@ func NewStore(db *pgx.Conn) *Store {
 	}
 }
 
+// CreateIsa creates a new Isa
 func (s *Store) CreateIsa(ctx context.Context, isa ISA) (string, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
@@ -58,6 +59,7 @@ func (s *Store) CreateIsa(ctx context.Context, isa ISA) (string, error) {
 	return isaID, nil
 }
 
+// GetIsa fetches the isa by its id
 func (s *Store) GetIsa(ctx context.Context, id string) (*ISA, error) {
 	logger := logrus.New().WithContext(ctx)
 
@@ -89,6 +91,7 @@ func (s *Store) GetIsa(ctx context.Context, id string) (*ISA, error) {
 	return &isa, nil
 }
 
+// UpdateIsa updates the details of an Isa
 func (s *Store) UpdateIsa(ctx context.Context, isaID string, cashBalance, investmentAmount float64) (*ISA, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
@@ -136,6 +139,7 @@ func (s *Store) UpdateIsa(ctx context.Context, isaID string, cashBalance, invest
 	return &updatedISA, nil
 }
 
+// AddFundToISA adds a fund to an isa
 func (s *Store) AddFundToISA(ctx context.Context, isaID, fundID string) (*ISA, error) {
 	logger := logrus.New().WithContext(ctx)
 
@@ -167,6 +171,7 @@ func (s *Store) AddFundToISA(ctx context.Context, isaID, fundID string) (*ISA, e
 	return &updatedISA, nil
 }
 
+// CreateFund creates a new fund
 func (s *Store) CreateFund(ctx context.Context, fund Fund) (string, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
@@ -201,6 +206,7 @@ func (s *Store) CreateFund(ctx context.Context, fund Fund) (string, error) {
 	return fundID, nil
 }
 
+// GetFund fetches the fund by its id
 func (s *Store) GetFund(ctx context.Context, id string) (*Fund, error) {
 	logger := logrus.New().WithContext(ctx)
 
@@ -368,7 +374,7 @@ func (s *Store) ListFunds(ctx context.Context) ([]Fund, error) {
 
 }
 
-// CreateInvestment
+// CreateInvestment creates investments made to a fund
 func (s *Store) CreateInvestment(ctx context.Context, investment Investment) (string, error) {
 	logger := logrus.New().WithContext(ctx)
 	now := time.Now()
@@ -378,8 +384,6 @@ func (s *Store) CreateInvestment(ctx context.Context, investment Investment) (st
 		"fund_id": investment.FundID,
 		"amount":  investment.Amount,
 	})
-
-	fmt.Println("ISA ID:", investment.ISAID, " Fund ID:", investment.FundID)
 
 	query := `INSERT INTO investments (id, isa_id, fund_id, amount, invested_at, created_at)
 	VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
@@ -404,6 +408,7 @@ func (s *Store) CreateInvestment(ctx context.Context, investment Investment) (st
 	return investmentID, nil
 }
 
+// GetInvestment fetches an investment by its ID
 func (s *Store) GetInvestment(ctx context.Context, investmentID string) (*Investment, error) {
 	logger := logrus.New().WithContext(ctx)
 	logger = logger.WithField("investment_id", investmentID)
@@ -430,4 +435,44 @@ func (s *Store) GetInvestment(ctx context.Context, investmentID string) (*Invest
 	}
 
 	return &investment, nil
+}
+
+// ListInvestments This lists all investments made in a particular isa
+func (s *Store) ListInvestments(ctx context.Context, isaID string) ([]Investment, error) {
+	logger := logrus.New().WithContext(ctx)
+	logger = logger.WithField("isa_id", isaID)
+
+	query := `SELECT id, isa_id, fund_id, amount, invested_at, created_at 
+			  FROM investments WHERE isa_id = $1`
+
+	rows, err := s.db.Query(ctx, query, isaID)
+	if err != nil {
+		logger.WithError(err).Error("Failed to execute query for listing investments")
+		return nil, fmt.Errorf("failed to execute query for listing investments: %w", err)
+	}
+	defer rows.Close()
+
+	var investments []Investment
+	for rows.Next() {
+		var investment Investment
+		if err := rows.Scan(
+			&investment.ID,
+			&investment.ISAID,
+			&investment.FundID,
+			&investment.Amount,
+			&investment.InvestedAt,
+			&investment.CreatedAt,
+		); err != nil {
+			logger.WithError(err).Error("Failed to scan investment row")
+			return nil, fmt.Errorf("failed to scan investment row: %w", err)
+		}
+		investments = append(investments, investment)
+	}
+
+	if err := rows.Err(); err != nil {
+		logger.WithError(err).Error("Error iterating over investment rows")
+		return nil, fmt.Errorf("error iterating over investment rows: %w", err)
+	}
+
+	return investments, nil
 }
