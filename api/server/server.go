@@ -1,11 +1,14 @@
 package server
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+
+	"slices"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +29,7 @@ func (s *Server) Start() error {
 	// Run the server
 	r.POST("/isa", s.CreateIsa)
 	r.POST("/fund", s.CreateFund)
+	r.POST("/isa/:id/invest", s.InvestIntoFund)
 
 	r.PUT("/funds/:id", s.UpdateFund)
 	r.PUT("/isa/:isa_id/fund/:fund_id", s.AddFundToIsa)
@@ -77,7 +81,7 @@ func (s *Server) GetIsa(c *gin.Context) {
 
 	isa, err := s.store.GetIsa(c.Request.Context(), isaID)
 	if err != nil {
-		if err == postgres.ErrNotFound {
+		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find Isa")
 			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
 			return
@@ -90,10 +94,6 @@ func (s *Server) GetIsa(c *gin.Context) {
 		"isa": isa,
 	})
 }
-
-//Add money to ISA
-
-//Deposit money into a fund, which in turn will subtract the cash balance from isa and add investments
 
 func (s *Server) CreateFund(c *gin.Context) {
 	var req CreateFundRequest
@@ -178,6 +178,7 @@ func (s *Server) ListFunds(c *gin.Context) {
 	})
 }
 
+// only one fund can be added at a time because it takes a single fund_id as a URL parameter.
 func (s *Server) AddFundToIsa(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	isaID := c.Param("isa_id")
@@ -185,7 +186,7 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 
 	updatedIsa, err := s.store.AddFundToISA(c.Request.Context(), isaID, fundID)
 	if err != nil {
-		if err == postgres.ErrNotFound {
+		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find Isa")
 			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
 			return
@@ -200,9 +201,102 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	})
 }
 
+// Deposit money into a fund, which in turn will subtract the cash balance from isa and add investments
+func (s *Server) InvestIntoFund(c *gin.Context) {
+	logger := logrus.New().WithContext(c.Request.Context())
+	var req InvestIntoFundRequest
+	isaID := c.Param("id")
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.WithError(err).Error("Invalid investment request")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request. Fund ID and amount are required."})
+		return
+	}
+
+	isa, err := s.store.GetIsa(c.Request.Context(), isaID)
+	if err != nil {
+		if errors.Is(err, postgres.ErrNotFound) {
+			logger.WithError(err).Error("Failed to find Isa")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Amount > isa.CashBalance {
+		logger.Warn("Insufficient cash balance to make this investment")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient balance for this investment. Please add funds to your account and try again"})
+		return
+	}
+
+	// Check if fund is selected in the isa.
+	fundExists := slices.Contains(isa.FundIDs, req.FundID)
+	if !fundExists {
+		logger.Warn("Fund not associated with ISA")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Fund not found in your ISA. Please add it before investing."})
+		return
+	}
+
+	investment := postgres.Investment{
+		ID:     uuid.NewString(),
+		ISAID:  isaID,
+		FundID: req.FundID,
+		Amount: req.Amount,
+	}
+
+	//update the isa: Deduct cash balance and increase investment amount
+	newCashBalance := isa.CashBalance - req.Amount
+	newInvestmentAmount := isa.InvestmentAmount + req.Amount
+
+	_, err = s.store.UpdateIsa(c.Request.Context(), isaID, newCashBalance, newInvestmentAmount)
+	if err != nil {
+		logger.WithError(err).Error("Failed to update ISA")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	//GetFund: So i can get the total_amount invested in the fund
+	fund, err := s.store.GetFund(c.Request.Context(), req.FundID)
+	if err != nil {
+		if errors.Is(err, postgres.ErrNotFound) {
+			logger.WithError(err).Error("Failed to find fund")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Fund not found. Please check the id and try again."})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	totalAmount := fund.TotalAmount + req.Amount
+	_, err = s.store.UpdateFundTotalAmount(c.Request.Context(), req.FundID, totalAmount)
+	if err != nil {
+		logger.WithError(err).Error("Failed to update Fund total amount")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	investmentID, err := s.store.CreateInvestment(c.Request.Context(), investment)
+	if err != nil {
+		logger.WithError(err).Error("Failed to create investment")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	logger = logger.WithFields(logrus.Fields{
+		"isa_id":  investment.ISAID,
+		"fund_id": investment.FundID,
+	})
+
+	logger.Info("Investment has been successfully made")
+	c.JSON(http.StatusOK, gin.H{
+		"investment_id": investmentID,
+	})
+}
+
 //TODO:
-//List Investments
 //Get Investments
+//List Investments
 
 /*
 When creating an investment, we need to make sure that the fund ID (the destination fund is related to the

@@ -18,3 +18,9 @@ type UpdateFundRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description" binding:"required"`
 }
+
+type InvestIntoFundRequest struct {
+	FundID string `json:"fund_id" binding:"required"`
+	// Amount has to be greater than 0.
+	Amount float64 `json:"amount" binding:"required,gt=0"`
+}
