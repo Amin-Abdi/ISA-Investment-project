@@ -16,6 +16,11 @@ type Store struct {
 	db *pgx.Conn
 }
 
+var (
+	//This is returned when a record in the store is not found
+	ErrNotFound = errors.New("record not found")
+)
+
 func NewStore(db *pgx.Conn) *Store {
 	return &Store{
 		db: db,
@@ -75,7 +80,7 @@ func (s *Store) GetIsa(ctx context.Context, id string) (*ISA, error) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("ISA not found")
-			return nil, fmt.Errorf("get isa: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute query for get isa")
 		return nil, fmt.Errorf("failed to execute query for get isa: %w", err)
@@ -122,7 +127,7 @@ func (s *Store) UpdateIsa(ctx context.Context, isaID string, cashBalance, invest
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("ISA not found for update")
-			return nil, fmt.Errorf("isa not found: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute update isa query")
 		return nil, fmt.Errorf("failed to execute update isa query: %w", err)
@@ -220,7 +225,7 @@ func (s *Store) GetFund(ctx context.Context, id string) (*Fund, error) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("Failed to find fund")
-			return nil, fmt.Errorf("get fund: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute query for get fund")
 		return nil, fmt.Errorf("failed to execute query for get fund: %w", err)
@@ -265,7 +270,7 @@ func (s *Store) UpdateFund(ctx context.Context, id, name, description string) (*
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("Fund not found for update")
-			return nil, fmt.Errorf("fund not found: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute update fund query")
 		return nil, fmt.Errorf("failed to execute update fund query: %w", err)
@@ -312,7 +317,7 @@ func (s *Store) UpdateFundTotalAmount(ctx context.Context, fundID string, totalA
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("Fund not found for update")
-			return nil, fmt.Errorf("fund not found: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute update fund total amount query")
 		return nil, fmt.Errorf("failed to execute update fund total amount query: %w", err)
@@ -418,7 +423,7 @@ func (s *Store) GetInvestment(ctx context.Context, investmentID string) (*Invest
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.WithError(err).Error("Investment not found")
-			return nil, fmt.Errorf("investment not found: %w", err)
+			return nil, ErrNotFound
 		}
 		logger.WithError(err).Error("Failed to execute get investment query")
 		return nil, fmt.Errorf("execute get investment query: %w", err)
