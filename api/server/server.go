@@ -3,14 +3,13 @@ package server
 import (
 	"errors"
 	"net/http"
-
-	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
-	"github.com/google/uuid"
-	"github.com/sirupsen/logrus"
-
 	"slices"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+
+	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
 )
 
 type Server struct {
@@ -36,6 +35,7 @@ func (s *Server) Start() error {
 
 	r.GET("/isa/:id", s.GetIsa)
 	r.GET("/funds", s.ListFunds)
+	r.GET("/investments/:isa_id", s.ListInvestments)
 
 	return r.Run(":8080")
 }
@@ -294,12 +294,18 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 	})
 }
 
-//TODO:
-//Get Investments
-//List Investments
+func (s *Server) ListInvestments(c *gin.Context) {
+	logger := logrus.New().WithContext(c.Request.Context())
+	isaID := c.Param("isa_id")
 
-/*
-When creating an investment, we need to make sure that the fund ID (the destination fund is related to the
-ISA otherwise return an error)
+	investments, err := s.store.ListInvestments(c.Request.Context(), isaID)
+	if err != nil {
+		logger.WithError(err).Error("Failed to list investments")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
-*/
+	c.JSON(http.StatusOK, gin.H{
+		"investments": investments,
+	})
+}
