@@ -5,12 +5,15 @@ import (
 	"log"
 	"os"
 
+	"github.com/Amin-Abdi/ISA-Investment-project/api/server"
+	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
 	"github.com/jackc/pgx/v4"
 )
 
 func main() {
 
 	//Load db from the environment
+	os.Setenv("DB_URL", "postgres://myuser:mypassword@localhost:5432/my_database?sslmode=disable")
 	dbURL := os.Getenv("DB_URL")
 
 	if dbURL == "" {
@@ -25,4 +28,10 @@ func main() {
 	}
 	defer conn.Close(ctx)
 
+	store := postgres.NewStore(conn)
+	s := server.NewServer(store)
+
+	if err := s.Start(); err != nil {
+		log.Fatalf("failed to start server: %v\n", err)
+	}
 }
