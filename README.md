@@ -96,3 +96,8 @@ Some key metrics I would like to track include:
 4. Cash balance trends across all ISAs – to analyze customer behavior and liquidity.
 
 By implementing these metrics, I could gain better visibility into the system, proactively detect issues, and provide valuable analytics for both technical monitoring and business decision-making.
+
+## API Documentation
+
+You can view the OpenAPI spec here:  
+[openapi.json](./docs/api.json)
