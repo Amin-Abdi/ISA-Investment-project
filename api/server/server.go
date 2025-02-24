@@ -56,6 +56,7 @@ func (s *Server) Start() error {
 	return r.Run(":8080")
 }
 
+// CreateIsa Creates an isa
 func (s *Server) CreateIsa(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	var req CreateISARequest
@@ -91,6 +92,7 @@ func (s *Server) CreateIsa(c *gin.Context) {
 	})
 }
 
+// GetIsa fetches an Isa
 func (s *Server) GetIsa(c *gin.Context) {
 	isaID := c.Param("id")
 	logger := logrus.New().WithContext(c.Request.Context())
@@ -111,6 +113,7 @@ func (s *Server) GetIsa(c *gin.Context) {
 	})
 }
 
+// CreateFund creates a new fund
 func (s *Server) CreateFund(c *gin.Context) {
 	var req CreateFundRequest
 	logger := logrus.New().WithContext(c.Request.Context())
@@ -147,6 +150,7 @@ func (s *Server) CreateFund(c *gin.Context) {
 	})
 }
 
+// UpdateFund updating the name/description of the fund
 func (s *Server) UpdateFund(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	var req UpdateFundRequest
@@ -179,6 +183,7 @@ func (s *Server) UpdateFund(c *gin.Context) {
 	})
 }
 
+// ListFunds lists all the avalaible funds
 func (s *Server) ListFunds(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 
@@ -194,7 +199,7 @@ func (s *Server) ListFunds(c *gin.Context) {
 	})
 }
 
-// only one fund can be added at a time because it takes a single fund_id as a URL parameter.
+// AddFundToIsa: Adds a fund to an Isa
 func (s *Server) AddFundToIsa(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	isaID := c.Param("isa_id")
@@ -241,7 +246,7 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	})
 }
 
-// Deposit money from an ISA to a fund
+// InvestIntoFund adds the investment money to the fund from the isa
 func (s *Server) InvestIntoFund(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	var req InvestIntoFundRequest
@@ -333,6 +338,7 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 	})
 }
 
+// ListInvestments lists the investments made in an isa
 func (s *Server) ListInvestments(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	isaID := c.Param("isa_id")
