@@ -272,7 +272,6 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 		return
 	}
 
-	//GetFund: So i can get the total_amount invested in the fund
 	fund, err := s.Store.GetFund(c.Request.Context(), req.FundID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {

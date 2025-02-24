@@ -1,0 +1,431 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+      "title": "ISA Fund Management API",
+      "version": "1.0.0",
+      "description": "API for managing ISAs and Funds, including creation, investment, and updates."
+    },
+    "paths": {
+      "/isa": {
+        "post": {
+            "summary": "Create a new ISA",
+            "operationId": "createIsa",
+            "requestBody": {
+            "content": {
+                "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "description": "The user ID"
+                    },
+                    "cash_balance": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "The initial cash balance for the ISA"
+                    }
+                    },
+                    "required": ["user_id", "cash_balance"]
+                }
+                }
+            }
+            },
+            "responses": {
+            "201": {
+                "description": "ISA successfully created",
+                "content": {
+                "application/json": {
+                    "schema": {
+                    "type": "object",
+                    "properties": {
+                        "isa_id": {
+                        "type": "string",
+                        "description": "The ID of the created ISA"
+                        },
+                        "message": {
+                        "type": "string",
+                        "example": "Isa successfully created",
+                        "description": "Success message"
+                        }
+                    }
+                    }
+                }
+                }
+            }
+            }
+        }
+      }, 
+     "/fund": {
+        "post": {
+            "summary": "Create a new fund",
+            "operationId": "createFund",
+            "requestBody": {
+            "content": {
+                "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the fund"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "A description of the fund"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": ["Equity", "Bond", "Index", "Mixed"],
+                        "description": "The type of the fund"
+                    },
+                    "risk_level": {
+                        "type": "string",
+                        "enum": ["Low", "Medium", "High"],
+                        "description": "The risk level of the fund"
+                    },
+                    "performance": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "The performance of the fund"
+                    },
+                    "total_amount": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "The total amount invested in the fund"
+                    }
+                    },
+                    "required": ["name", "description", "type", "risk_level"]
+                }
+                }
+            }
+            },
+            "responses": {
+            "201": {
+                "description": "Fund successfully created",
+                "content": {
+                "application/json": {
+                    "schema": {
+                    "type": "object",
+                    "properties": {
+                        "isa_id": {
+                        "type": "string",
+                        "description": "The ID of the created fund"
+                        },
+                        "message": {
+                        "type": "string",
+                        "example": "Fund successfully created",
+                        "description": "Success message"
+                        }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/isa/{id}": {
+        "get": {
+            "summary": "Get details of an ISA",
+            "operationId": "getIsa",
+            "parameters": [
+            {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": {
+                "type": "string",
+                "description": "The ID of the ISA"
+                }
+            }
+            ],
+            "responses": {
+            "200": {
+                "description": "ISA details fetched successfully",
+                "content": {
+                "application/json": {
+                    "schema": {
+                    "type": "object",
+                    "properties": {
+                        "isa": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                            "type": "string",
+                            "description": "The ID of the ISA"
+                            },
+                            "user_id": {
+                            "type": "string",
+                            "description": "The user ID associated with the ISA"
+                            },
+                            "fund_ids": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "description": "The list of fund IDs associated with the ISA"
+                            }
+                            },
+                            "cash_balance": {
+                            "type": "number",
+                            "format": "float",
+                            "description": "The current cash balance of the ISA"
+                            },
+                            "investment_amount": {
+                            "type": "number",
+                            "format": "float",
+                            "description": "The total investment amount in the ISA"
+                            },
+                            "created_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "The creation timestamp of the ISA"
+                            },
+                            "updated_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "The last update timestamp of the ISA"
+                            }
+                        },
+                        "required": ["id", "user_id", "fund_ids", "cash_balance", "investment_amount", "created_at", "updated_at"]
+                        }
+                    }
+                    }
+                }
+                }
+            },
+            "404": {
+                "description": "ISA not found"
+            }
+          }
+        }
+      },
+     "/funds": {
+        "get": {
+            "summary": "List all funds",
+            "operationId": "listFunds",
+            "responses": {
+            "200": {
+                "description": "List of funds retrieved successfully",
+                "content": {
+                "application/json": {
+                    "schema": {
+                    "type": "object",
+                    "properties": {
+                        "funds": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "The unique identifier of the fund"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "The name of the fund"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "A brief description of the fund"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": ["Equity", "Bond", "Index", "Mixed"],
+                                "description": "The type of the fund"
+                            },
+                            "risk_level": {
+                                "type": "string",
+                                "enum": ["Low", "Medium", "High"],
+                                "description": "The risk level of the fund"
+                            },
+                            "performance": {
+                                "type": "number",
+                                "format": "float",
+                                "description": "The performance of the fund"
+                            },
+                            "total_amount": {
+                                "type": "number",
+                                "format": "float",
+                                "description": "The total amount invested in the fund"
+                            },
+                            "created_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "The timestamp when the fund was created"
+                            },
+                            "updated_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "The timestamp when the fund was last updated"
+                            }
+                            },
+                            "required": [
+                            "id", "name", "description", "type", "risk_level", "performance", "total_amount", "created_at", "updated_at"
+                            ]
+                        }
+                        }
+                    }
+                    }
+                }
+                }
+            }
+            }
+        }
+      },
+     "/isa/{isa_id}/fund/{fund_id}": {
+        "put": {
+            "summary": "Add a fund to an ISA",
+            "operationId": "addFundToIsa",
+            "parameters": [
+            {
+                "name": "isa_id",
+                "in": "path",
+                "required": true,
+                "schema": {
+                "type": "string",
+                "description": "The ID of the ISA"
+                }
+            },
+            {
+                "name": "fund_id",
+                "in": "path",
+                "required": true,
+                "schema": {
+                "type": "string",
+                "description": "The ID of the fund"
+                }
+            }
+            ],
+            "responses": {
+                "200": {
+                    "description": "Fund successfully added to ISA",
+                    "content": {
+                    "application/json": {
+                        "schema": {
+                        "type": "object",
+                        "properties": {
+                            "message": {
+                            "type": "string",
+                            "example": "Fund successfully added to ISA"
+                            },
+                            "updated_isa": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                "type": "string",
+                                "description": "The ID of the updated ISA"
+                                },
+                                "user_id": {
+                                "type": "string",
+                                "description": "The ID of the user associated with the ISA"
+                                },
+                                "fund_ids": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "description": "The IDs of the funds in the ISA"
+                                },
+                                "description": "A list of fund IDs associated with the ISA"
+                                },
+                                "cash_balance": {
+                                "type": "number",
+                                "format": "float",
+                                "description": "The cash balance of the ISA"
+                                },
+                                "investment_amount": {
+                                "type": "number",
+                                "format": "float",
+                                "description": "The total investment amount in the ISA"
+                                },
+                                "created_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Timestamp when the ISA was created"
+                                },
+                                "updated_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Timestamp when the ISA was last updated"
+                                }
+                            },
+                            "required": [
+                                "id", "user_id", "fund_ids", "cash_balance", "investment_amount", "created_at", "updated_at"
+                            ]
+                            }
+                        }
+                        }
+                    }
+                    }
+                }
+            }
+        }
+      },
+     "/isa/{id}/invest": {
+        "post": {
+            "summary": "Invest into a fund from an ISA",
+            "operationId": "investIntoFund",
+            "parameters": [
+            {
+                "name": "id",
+                "in": "path",
+                "required": true,
+                "schema": {
+                "type": "string",
+                "description": "The ID of the ISA"
+                }
+            }
+            ],
+            "requestBody": {
+            "content": {
+                "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                    "fund_id": {
+                        "type": "string",
+                        "description": "The ID of the fund to invest in"
+                    },
+                    "amount": {
+                        "type": "number",
+                        "format": "float",
+                        "description": "The amount to invest from the ISA"
+                    }
+                    },
+                    "required": ["fund_id", "amount"]
+                }
+                }
+            }
+            },
+            "responses": {
+            "200": {
+                "description": "Investment successfully made",
+                "content": {
+                "application/json": {
+                    "schema": {
+                    "type": "object",
+                    "properties": {
+                        "investment_id": {
+                        "type": "string",
+                        "description": "The ID of the created investment"
+                        }
+                    },
+                    "example": {
+                        "investment_id": "d534c0e8-93ad-4889-94fe-7d1ccecfcbcd"
+                    }
+                    }
+                }
+                }
+            },
+            "400": {
+                "description": "Invalid request or insufficient funds"
+            },
+            "404": {
+                "description": "ISA or fund not found"
+            }
+            }
+        }
+      }    
+    }
+}
+  
