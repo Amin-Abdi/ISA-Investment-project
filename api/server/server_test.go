@@ -23,6 +23,7 @@ func setupTestServer(store *mocks.StoreMock) *gin.Engine {
 	s := &server.Server{Store: store}
 	r := gin.Default()
 	r.POST("/isa/:id/invest", s.InvestIntoFund)
+	r.PUT("/isa/:isa_id/fund/:fund_id", s.AddFundToIsa)
 
 	return r
 }
@@ -223,6 +224,106 @@ func TestInvestInFund(t *testing.T) {
 
 			if test.errorReturned {
 				assert.Equal(t, test.expectedResponse, response["error"])
+			}
+		})
+	}
+}
+
+func TestAddFundToIsa(t *testing.T) {
+	now := time.Now()
+	tests := map[string]struct {
+		isaID       string
+		fundID      string
+		getIsa      postgres.ISA
+		getIsaError error
+
+		addFundError     error
+		updatedIsa       postgres.ISA
+		errorReturned    bool
+		expectedStatus   int
+		expectedResponse interface{}
+	}{
+		"failure: isa not found": {
+			isaID:            "non-existent-isa",
+			fundID:           "fund-123",
+			getIsaError:      postgres.ErrNotFound,
+			errorReturned:    true,
+			expectedStatus:   http.StatusNotFound,
+			expectedResponse: "Isa not found. Please check the id and try again.",
+		},
+
+		"failure: isa already has a fund": {
+			isaID:  "62ad0fef-9bdc-43a1-85ca-05b60f39cf8f",
+			fundID: "fund-123",
+			getIsa: postgres.ISA{
+				ID:        "62ad0fef-9bdc-43a1-85ca-05b60f39cf8f",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				FundIDs:   []string{"existing-fund"},
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+			errorReturned:    true,
+			expectedStatus:   http.StatusBadRequest,
+			expectedResponse: "This ISA already has a fund associated with it. Only one fund can be added.",
+		},
+
+		"success: fund added to isa": {
+			isaID:  "62ad0fef-9bdc-43a1-85ca-05b60f39cf8f",
+			fundID: "fund-123",
+			getIsa: postgres.ISA{
+				ID:        "62ad0fef-9bdc-43a1-85ca-05b60f39cf8f",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				FundIDs:   []string{}, // No existing fund
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+			updatedIsa: postgres.ISA{
+				ID:        "62ad0fef-9bdc-43a1-85ca-05b60f39cf8f",
+				UserID:    "123e4567-e89b-12d3-a456-426614174000",
+				FundIDs:   []string{"fund-123"}, // Fund added
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+			expectedStatus: http.StatusOK,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			mockStore := &mocks.StoreMock{
+				GetIsaFunc: func(ctx context.Context, id string) (*postgres.ISA, error) {
+					assert.Equal(t, test.isaID, id)
+					if test.getIsaError != nil {
+						return nil, test.getIsaError
+					}
+					return &test.getIsa, nil
+				},
+				AddFundToISAFunc: func(ctx context.Context, isaID, fundID string) (*postgres.ISA, error) {
+					assert.Equal(t, test.isaID, isaID)
+					assert.Equal(t, test.fundID, fundID)
+					if test.addFundError != nil {
+						return nil, test.addFundError
+					}
+					return &test.updatedIsa, nil
+				},
+			}
+
+			r := setupTestServer(mockStore)
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest("PUT", "/isa/"+test.isaID+"/fund/"+test.fundID, nil)
+
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, test.expectedStatus, w.Code)
+
+			var response map[string]interface{}
+			_ = json.Unmarshal(w.Body.Bytes(), &response)
+
+			if test.errorReturned {
+				assert.Equal(t, test.expectedResponse, response["error"])
+			} else {
+				assert.Equal(t, "Fund successfully added to ISA", response["message"])
 			}
 		})
 	}

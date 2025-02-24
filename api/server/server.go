@@ -200,6 +200,30 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	isaID := c.Param("isa_id")
 	fundID := c.Param("fund_id")
 
+	logger = logger.WithFields(logrus.Fields{
+		"isa_id":  isaID,
+		"fund_id": fundID,
+	})
+
+	getIsa, err := s.Store.GetIsa(c.Request.Context(), isaID)
+	if err != nil {
+		if errors.Is(err, postgres.ErrNotFound) {
+			logger.WithError(err).Error("Failed to find Isa")
+			c.JSON(http.StatusNotFound, gin.H{"error": "Isa not found. Please check the id and try again."})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len(getIsa.FundIDs) > 0 {
+		logger.Error("ISA already has a fund associated with it. Cannot add another fund.")
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "This ISA already has a fund associated with it. Only one fund can be added.",
+		})
+		return
+	}
+
 	updatedIsa, err := s.Store.AddFundToISA(c.Request.Context(), isaID, fundID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
