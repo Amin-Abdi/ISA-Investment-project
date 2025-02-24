@@ -13,7 +13,7 @@ import (
 	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
 )
 
-type Store interface {
+type StoreInterface interface {
 	CreateIsa(ctx context.Context, isa postgres.ISA) (string, error)
 	GetIsa(ctx context.Context, id string) (*postgres.ISA, error)
 	UpdateIsa(ctx context.Context, isaID string, cashBalance, investmentAmount float64) (*postgres.ISA, error)
@@ -29,12 +29,12 @@ type Store interface {
 }
 
 type Server struct {
-	store *postgres.Store
+	Store StoreInterface
 }
 
 func NewServer(store *postgres.Store) *Server {
 	return &Server{
-		store: store,
+		Store: store,
 	}
 }
 
@@ -75,7 +75,7 @@ func (s *Server) CreateIsa(c *gin.Context) {
 		InvestmentAmount: 0, //Opening a new ISA, the invested amount will be 0.
 	}
 
-	createdIsaID, err := s.store.CreateIsa(c.Request.Context(), isa)
+	createdIsaID, err := s.Store.CreateIsa(c.Request.Context(), isa)
 
 	if err != nil {
 		logger.WithError(err).Error("Failed to create ISA")
@@ -95,7 +95,7 @@ func (s *Server) GetIsa(c *gin.Context) {
 	isaID := c.Param("id")
 	logger := logrus.New().WithContext(c.Request.Context())
 
-	isa, err := s.store.GetIsa(c.Request.Context(), isaID)
+	isa, err := s.Store.GetIsa(c.Request.Context(), isaID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find Isa")
@@ -133,7 +133,7 @@ func (s *Server) CreateFund(c *gin.Context) {
 		TotalAmount: req.TotalAmount,
 	}
 
-	createdFundID, err := s.store.CreateFund(c.Request.Context(), fund)
+	createdFundID, err := s.Store.CreateFund(c.Request.Context(), fund)
 	if err != nil {
 		logger.WithError(err).Error("Failed to create fund")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -159,7 +159,7 @@ func (s *Server) UpdateFund(c *gin.Context) {
 
 	fundID := c.Param("id")
 
-	updatedFund, err := s.store.UpdateFund(c.Request.Context(), fundID, req.Name, req.Description)
+	updatedFund, err := s.Store.UpdateFund(c.Request.Context(), fundID, req.Name, req.Description)
 	if err != nil {
 		if err == postgres.ErrNotFound {
 			logger.WithError(err).Error("Failed to find fund")
@@ -182,7 +182,7 @@ func (s *Server) UpdateFund(c *gin.Context) {
 func (s *Server) ListFunds(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 
-	funds, err := s.store.ListFunds(c.Request.Context())
+	funds, err := s.Store.ListFunds(c.Request.Context())
 	if err != nil {
 		logger.WithError(err).Error("Failed to retrieve funds")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -200,7 +200,7 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	isaID := c.Param("isa_id")
 	fundID := c.Param("fund_id")
 
-	updatedIsa, err := s.store.AddFundToISA(c.Request.Context(), isaID, fundID)
+	updatedIsa, err := s.Store.AddFundToISA(c.Request.Context(), isaID, fundID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find Isa")
@@ -217,7 +217,7 @@ func (s *Server) AddFundToIsa(c *gin.Context) {
 	})
 }
 
-// Deposit money into a fund, which in turn will subtract the cash balance from isa and add investments
+// Deposit money from an ISA to a fund
 func (s *Server) InvestIntoFund(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	var req InvestIntoFundRequest
@@ -229,7 +229,7 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 		return
 	}
 
-	isa, err := s.store.GetIsa(c.Request.Context(), isaID)
+	isa, err := s.Store.GetIsa(c.Request.Context(), isaID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find Isa")
@@ -265,7 +265,7 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 	newCashBalance := isa.CashBalance - req.Amount
 	newInvestmentAmount := isa.InvestmentAmount + req.Amount
 
-	_, err = s.store.UpdateIsa(c.Request.Context(), isaID, newCashBalance, newInvestmentAmount)
+	_, err = s.Store.UpdateIsa(c.Request.Context(), isaID, newCashBalance, newInvestmentAmount)
 	if err != nil {
 		logger.WithError(err).Error("Failed to update ISA")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -273,7 +273,7 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 	}
 
 	//GetFund: So i can get the total_amount invested in the fund
-	fund, err := s.store.GetFund(c.Request.Context(), req.FundID)
+	fund, err := s.Store.GetFund(c.Request.Context(), req.FundID)
 	if err != nil {
 		if errors.Is(err, postgres.ErrNotFound) {
 			logger.WithError(err).Error("Failed to find fund")
@@ -285,14 +285,14 @@ func (s *Server) InvestIntoFund(c *gin.Context) {
 	}
 
 	totalAmount := fund.TotalAmount + req.Amount
-	_, err = s.store.UpdateFundTotalAmount(c.Request.Context(), req.FundID, totalAmount)
+	_, err = s.Store.UpdateFundTotalAmount(c.Request.Context(), req.FundID, totalAmount)
 	if err != nil {
 		logger.WithError(err).Error("Failed to update Fund total amount")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	investmentID, err := s.store.CreateInvestment(c.Request.Context(), investment)
+	investmentID, err := s.Store.CreateInvestment(c.Request.Context(), investment)
 	if err != nil {
 		logger.WithError(err).Error("Failed to create investment")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -314,7 +314,7 @@ func (s *Server) ListInvestments(c *gin.Context) {
 	logger := logrus.New().WithContext(c.Request.Context())
 	isaID := c.Param("isa_id")
 
-	investments, err := s.store.ListInvestments(c.Request.Context(), isaID)
+	investments, err := s.Store.ListInvestments(c.Request.Context(), isaID)
 	if err != nil {
 		logger.WithError(err).Error("Failed to list investments")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

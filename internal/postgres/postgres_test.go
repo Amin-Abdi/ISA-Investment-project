@@ -3,61 +3,19 @@ package postgres_test
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/Amin-Abdi/ISA-Investment-project/internal/postgres"
-	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func setupTestDB() (*pgx.Conn, func(), error) {
-	dbURL := os.Getenv("DB_URL")
-	fmt.Println("My test url", dbURL)
-
-	if dbURL == "" {
-		return nil, nil, fmt.Errorf("DB_URL is not set")
-	}
-
-	ctx := context.Background()
-
-	// Set up the connection
-	conn, err := pgx.Connect(ctx, dbURL)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Create cleanup function to disconnect and remove test data
-	cleanup := func() {
-		//Delete all the test data inserted into the DB
-		_, err := conn.Exec(context.Background(), "DELETE FROM isas")
-		if err != nil {
-			log.Fatalf("Failed to cleanup isas table: %v", err)
-		}
-
-		_, err = conn.Exec(context.Background(), "DELETE FROM funds")
-		if err != nil {
-			log.Fatalf("Failed to cleanup isas table: %v", err)
-		}
-
-		_, err = conn.Exec(context.Background(), "DELETE FROM investments")
-		if err != nil {
-			log.Fatalf("Failed to cleanup investments table: %v", err)
-		}
-		conn.Close(ctx)
-	}
-
-	return conn, cleanup, nil
-}
 
 func TestCreateISA(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 	//Set up the test database
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -126,7 +84,7 @@ func TestCreateISA(t *testing.T) {
 func TestAddFundToIsa(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -165,7 +123,7 @@ func TestAddFundToIsa(t *testing.T) {
 func TestUpdateISA(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -231,7 +189,7 @@ func TestCreateFund(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the test database
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -291,7 +249,7 @@ func TestGetFundNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up the test database
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -312,7 +270,7 @@ func TestGetFundNotFound(t *testing.T) {
 func TestUpdateFund(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -378,7 +336,7 @@ func TestUpdateFundTotalAmount(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now()
 
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -417,7 +375,7 @@ func TestUpdateFundTotalAmount(t *testing.T) {
 
 func TestListFunds(t *testing.T) {
 	ctx := context.Background()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -468,7 +426,7 @@ func TestListFunds(t *testing.T) {
 
 func TestCreateInvestment(t *testing.T) {
 	ctx := context.Background()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
@@ -557,7 +515,7 @@ func TestCreateInvestment(t *testing.T) {
 
 func TestListInvestments(t *testing.T) {
 	ctx := context.Background()
-	conn, cleanup, err := setupTestDB()
+	conn, cleanup, err := postgres.SetupTestDB()
 	if err != nil {
 		t.Fatalf("Failed to set up database: %v", err)
 	}
