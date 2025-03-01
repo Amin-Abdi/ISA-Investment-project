@@ -98,6 +98,5 @@ Some key metrics I would like to track include:
 By implementing these metrics, I could gain better visibility into the system, proactively detect issues, and provide valuable analytics for both technical monitoring and business decision-making.
 
 ## API Documentation
-
 You can view the OpenAPI spec here:  
 [openapi.json](./docs/api.json)
